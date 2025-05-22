@@ -399,5 +399,5 @@ def shor(N, a, shots=1024):
 
 if __name__ == "__main__":
     N = 33
-    a = 2
+    a = 5
     shor(N, a, shots=512)
