@@ -3,8 +3,9 @@ import math
 import fractions
 from collections import Counter
 
+
 class QuantumCircuit:
-    def __init__(self, num_qubits):
+    def __init__(self, num_qubits: int):
         """Создаёт вектор квантовой системы и задаёт ей состояние |0...0>
 
         :param num_qubits: количество кубитов во всей системе
@@ -13,7 +14,13 @@ class QuantumCircuit:
         self.state = np.zeros((2 ** num_qubits,), dtype=complex)
         self.state[0] = 1
 
-    def apply_gate(self, gate, targets):
+    def apply_gate(self, gate: np.ndarray, targets: list[int]):
+        """Действует гейтом на заданные кубиты
+
+        :param gate: унитарная матрица 2x2, действующая как гейт
+        :param targets: массив, содержащий индексы кубитов, на которые нужно подействовать гейтом
+        :return: None
+        """
         full_gate = 1
         for i in range(self.num_qubits):
             if i in targets:
@@ -22,7 +29,14 @@ class QuantumCircuit:
                 full_gate = np.kron(full_gate, np.eye(2))
         self.state = full_gate @ self.state
 
-    def apply_controlled_gate(self, gate, control, target):
+    def apply_controlled_gate(self, gate: np.ndarray, control: int, target: int):
+        """Применяет гейт к целевому кубиту при условии, что управляющий кубит находится в состоянии |1⟩.
+
+        :param gate: унитарная матрица 2x2, представляющая гейт, который применяется к целевому кубиту при выполнении условия
+        :param control: индекс управляющего кубита
+        :param target: индекс целевого кубита
+        :return: None
+        """
         size = 2 ** self.num_qubits
         result = np.zeros((size, size), dtype=complex)
         for i in range(size):
@@ -36,7 +50,14 @@ class QuantumCircuit:
                 result[i, i] = 1
         self.state = result @ self.state
 
-    def apply_controlled_phase(self, theta, control, target):
+    def apply_controlled_phase(self, theta: float, control: int, target: int):
+        """Применяет контролируемый фазовый сдвиг к целевому кубиту, если управляющий и целевой кубиты находятся в состоянии |1⟩.
+
+        :param theta: угол фазового сдвига в радианах
+        :param control: индекс управляющего кубита
+        :param target: индекс целевого кубита
+        :return: None
+        """
         size = 2 ** self.num_qubits
         matrix = np.eye(size, dtype=complex)
         for i in range(size):
@@ -45,7 +66,12 @@ class QuantumCircuit:
                 matrix[i, i] *= np.exp(1j * theta)
         self.state = matrix @ self.state
 
-    def measure(self, shots=1024):
+    def measure(self, shots=1024) -> dict[str, int]:
+        """Выполняет измерение квантового состояния заданное число раз и возвращает распределение результатов.
+
+        :param shots: количество измерений (по умолчанию 1024)
+        :return: словарь, содержащий строки бит в количество раз, сколько они появились
+        """
         probs = np.abs(self.state) ** 2
         outcomes = [format(i, f'0{self.num_qubits}b') for i in range(2 ** self.num_qubits)]
         measurements = np.random.choice(outcomes, size=shots, p=probs)
@@ -56,7 +82,7 @@ H = (1 / np.sqrt(2)) * np.array([[1, 1], [1, -1]], dtype=complex)
 X = np.array([[0, 1], [1, 0]], dtype=complex)
 P = lambda theta: np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=complex)
 
-def qft(circuit, qubits):
+def qft(circuit: QuantumCircuit, qubits: list[int]):
     """Делает прямое квантовые преобразование Фурье
 
     :param circuit: Квантовая схема, в которой выполняется преобразование
@@ -71,7 +97,7 @@ def qft(circuit, qubits):
             angle = np.pi / (2 ** (j - i))
             circuit.apply_controlled_phase(angle, qubits[j], qubits[i])
 
-def inverse_qft(circuit, qubits):
+def inverse_qft(circuit: QuantumCircuit, qubits: list[int]):
     """Делает обратное квантовые преобразование Фурье
 
     :param circuit: Квантовая схема, в которой выполняется преобразование
@@ -86,13 +112,12 @@ def inverse_qft(circuit, qubits):
             circuit.apply_controlled_phase(angle, qubits[j], qubits[i])
         circuit.apply_gate(H, [qubits[i]])
 
-def get_angles(a, n):
+def get_angles(a: int, n: int) -> np.ndarray[tuple[int], np.dtype[float]]:
     """Используется для симуляции фазовых сдвигов в функции phiADD, строит массив углов фазовых сдвигов
 
     :param a: Число для прибавления к квантовому регистру
     :param n: Количество кубитов в верхнем регистре
     :return: Массив из n углов, соответствующих фазовым поворотам, которые реализуют добавление числа a к квантовому регистру
-    :rtype: dict[float]
     """
     s = bin(a)[2:].zfill(n)
     angles = np.zeros(n)
@@ -103,7 +128,7 @@ def get_angles(a, n):
         angles[n - i - 1] *= np.pi
     return angles
 
-def ccphase(circuit, theta, ctrl1, ctrl2, target):
+def ccphase(circuit: QuantumCircuit, theta: float, ctrl1: int, ctrl2: int, target: int):
     """Выполняет дважды контролируемый фазовый сдвиг
 
     :param circuit: Квантовая схема, в которой выполняется операция
@@ -122,7 +147,7 @@ def ccphase(circuit, theta, ctrl1, ctrl2, target):
             matrix[i, i] *= np.exp(1j * theta)
     circuit.state = matrix @ circuit.state
 
-def phiADD(circuit, qubits, a, n, inv=False):
+def phiADD(circuit: QuantumCircuit, qubits: list[int], a: int, inv=False):
     """Выполняет прибавление числа a к регистру qubits в фазовом представлении
     с помощью поразрядных фазовых поворотов
 
@@ -134,16 +159,17 @@ def phiADD(circuit, qubits, a, n, inv=False):
     :type circuit: QuantumCircuit
     :param qubits: Регистр, к которому прибавляется (или из которого вычитается) число a
     :param a: Целое число, которое прибавляется по модулю
-    :param n: Количество кубитов в регистре qubits
     :param inv: Флаг, указывающий на выполнение вычитания вместо прибавления
     :return: None
     """
+    n = len(qubits)
     angles = get_angles(a, n)
     for i in range(n):
         angle = -angles[i] if inv else angles[i]
         circuit.apply_gate(P(angle), [qubits[i]])
 
-def cphiADD(circuit, qubits, ctrl, a, n, inv=False):
+
+def cphiADD(circuit: QuantumCircuit, qubits: list[int], ctrl: int, a: int, inv=False):
     """Выполняет контролируемое прибавление числа a к квантовому регистру в фазовом представлении
 
     Реализует поразрядное прибавление фазовых сдвигов к каждому кубиту регистра,
@@ -154,20 +180,20 @@ def cphiADD(circuit, qubits, ctrl, a, n, inv=False):
     для построения модульной арифметики в алгоритме Шора
 
     :param circuit: Квантовая схема, в которой выполняется операция
-    :type circuit: QuantumCircuit
     :param qubits: Регистр, к которому прибавляется (или из которого вычитается) число a
     :param ctrl: Индекс управляющего кубита
     :param a: Число, которое прибавляется (или вычитается)
-    :param n: Количество кубитов в регистре qubits
     :param inv: Флаг, указывающий, нужно ли вычитать вместо прибавления (по умолчанию False)
     :return: None
     """
+    n = len(qubits)
     angles = get_angles(a, n)
     for i in range(n):
         angle = -angles[i] if inv else angles[i]
         circuit.apply_controlled_phase(angle, ctrl, qubits[i])
 
-def ccphiADD(circuit, qubits, ctrl1, ctrl2, a, n, inv=False):
+
+def ccphiADD(circuit: QuantumCircuit, qubits: list[int], ctrl1: int, ctrl2: int, a: int, inv=False):
     """Выполняет дважды контролируемое прибавление числа a к регистру qubits в фазовом представлении
 
     Реализует поразрядное прибавление фазовых сдвигов к каждому кубиту регистра,
@@ -180,16 +206,17 @@ def ccphiADD(circuit, qubits, ctrl1, ctrl2, a, n, inv=False):
     :param ctrl1: Индекс первого управляющего кубита
     :param ctrl2: Индекс второго управляющего кубита
     :param a: Число, которое прибавляется (или вычитается)
-    :param n: Количество кубитов в регистре qubits
     :param inv: Флаг, указывающий, нужно ли вычитать вместо прибавления (по умолчанию False)
     :return: None
     """
+    n = len(qubits)
     angles = get_angles(a, n)
     for i in range(n):
         angle = -angles[i] if inv else angles[i]
         ccphase(circuit, angle, ctrl1, ctrl2, qubits[i])
 
-def ccphiADDmodN(circuit, q, ctrl1, ctrl2, aux_bit, a, N, n):
+
+def ccphiADDmodN(circuit: QuantumCircuit, qubits: list[int], ctrl1: int, ctrl2: int, aux_bit: int, a: int, N: int):
     """Выполняет дважды контролируемое прибавление числа a по модулю N к регистру q
 
     Реализует следующую логику:
@@ -202,32 +229,33 @@ def ccphiADDmodN(circuit, q, ctrl1, ctrl2, aux_bit, a, N, n):
 
     :param circuit: Квантовая схема
     :type circuit: QuantumCircuit
-    :param q: Регистр, к которому прибавляется число
+    :param qubits: Регистр, к которому прибавляется число
     :param ctrl1: Индекс первого управляющего кубита
     :param ctrl2: Индекс второго управляющего кубита
     :param aux_bit: Вспомогательный кубит для отслеживания переполнения
     :param a: Число, которое прибавляется по модулю N
     :param N: Модуль
-    :param n: Количество кубитов в регистре q
     :return: None
     """
-    ccphiADD(circuit, q, ctrl1, ctrl2, a, n, inv=False) # условное прибавление a
-    phiADD(circuit, q, N, n, inv=True)                  # безусловное вычитание N (получаем x + a - N)
-    inverse_qft(circuit, q)                             # проверяем переполнение
-    circuit.apply_gate(X, [q[-1]])
-    circuit.apply_controlled_gate(X, q[-1], aux_bit)
-    circuit.apply_gate(X, [q[-1]])
-    qft(circuit, q)
-    cphiADD(circuit, q, aux_bit, N, n, inv=False)       # если было переполнение — прибавляем N обратно
-    ccphiADD(circuit, q, ctrl1, ctrl2, a, n, inv=True)  # Вычитаем a обратно, чтобы восстановить начальное значение x, если переполнение произошло
-    inverse_qft(circuit, q)                             # вновь проверяем и сбрасываем aux_bit
-    circuit.apply_gate(X, [q[-1]])
-    circuit.apply_controlled_gate(X, q[-1], aux_bit)
-    circuit.apply_gate(X, [q[-1]])
-    qft(circuit, q)
-    ccphiADD(circuit, q, ctrl1, ctrl2, a, n, inv=False) # прибавляем a, так как не будет переполнения
+    ccphiADD(circuit, qubits, ctrl1, ctrl2, a, inv=False)  # условное прибавление a
+    phiADD(circuit, qubits, N, inv=True)  # безусловное вычитание N (получаем x + a - N)
+    inverse_qft(circuit, qubits)  # проверяем переполнение
+    circuit.apply_gate(X, [qubits[-1]])
+    circuit.apply_controlled_gate(X, qubits[-1], aux_bit)
+    circuit.apply_gate(X, [qubits[-1]])
+    qft(circuit, qubits)
+    cphiADD(circuit, qubits, aux_bit, N, inv=False)  # если было переполнение — прибавляем N обратно
+    ccphiADD(circuit, qubits, ctrl1, ctrl2, a,
+             inv=True)  # Вычитаем a обратно, чтобы восстановить начальное значение x, если переполнение произошло
+    inverse_qft(circuit, qubits)  # вновь проверяем и сбрасываем aux_bit
+    circuit.apply_gate(X, [qubits[-1]])
+    circuit.apply_controlled_gate(X, qubits[-1], aux_bit)
+    circuit.apply_gate(X, [qubits[-1]])
+    qft(circuit, qubits)
+    ccphiADD(circuit, qubits, ctrl1, ctrl2, a, inv=False)  # прибавляем a, так как не будет переполнения
 
-def egcd(a, b):
+
+def egcd(a: int, b: int):
     """Реализует расширенный алгоритм Евклида
 
     Находит наибольший общий делитель g = gcd(a, b), а также такие целые коэффициенты x и y, что:
@@ -245,7 +273,8 @@ def egcd(a, b):
         g, y, x = egcd(b % a, a)
         return g, x - (b // a) * y, y
 
-def modinv(a, m):
+
+def modinv(a: int, m: int):
     """Вычисляет обратный элемент по модулю m, то есть такое x, что a·x ≡ 1 mod m
 
     Использует расширенный алгоритм Евклида. Если числа не взаимно просты, вызывается исключение
@@ -260,7 +289,8 @@ def modinv(a, m):
         raise Exception('Обратного по модулю не существует')
     return x % m
 
-def cMULTmodN(circuit, ctrl, x_qubits, out_qubits, aux_bit, a, N, n):
+
+def cMULTmodN(circuit: QuantumCircuit, ctrl: int, x_qubits: list[int], out_qubits: list[int], aux_bit: int, a: int, N: int):
     """Выполняет контролируемое умножение регистра на число a по модулю N
 
     Реализует операцию |x⟩ ⊗ |y⟩ → |x⟩ ⊗ |(y · a^x) mod N⟩, если управляющий кубит установлен
@@ -268,23 +298,23 @@ def cMULTmodN(circuit, ctrl, x_qubits, out_qubits, aux_bit, a, N, n):
     Операция выполняется поразрядно в фазовом представлении с использованием квантового преобразования Фурье
 
     :param circuit: Квантовая схема, в которой выполняется операция
-    :type circuit: QuantumCircuit
     :param ctrl: Индекс управляющего кубита, активирующего операцию
     :param x_qubits: Регистр, содержащий число x (в показателе степени)
     :param out_qubits: Регистр, который будет умножен на a^x mod N
     :param aux_bit: Вспомогательный кубит для контроля переполнения при mod N
     :param a: Множитель, основание степени
     :param N: Модуль
-    :param n: Количество кубитов в регистрах (разрядность)
     :return: None
     """
+    n = len(x_qubits)
     qft(circuit, out_qubits)
     for i in range(n):
         factor = (pow(2, i) * a) % N
-        ccphiADDmodN(circuit, out_qubits, x_qubits[i], ctrl, aux_bit, factor, N, n)
+        ccphiADDmodN(circuit, out_qubits, x_qubits[i], ctrl, aux_bit, factor, N)
     inverse_qft(circuit, out_qubits)
 
-def initialize_shor_circuit(N):
+
+def initialize_shor_circuit(N: int):
     """Подготавливает начальное квантовое состояние для алгоритма Шора:
 
     верхний регистр инициализируется в равномерную суперпозицию,
@@ -312,7 +342,8 @@ def initialize_shor_circuit(N):
 
     return qc, up_reg, down_reg, aux_bit, n
 
-def apply_controlled_exponentiation(qc, up_reg, down_reg, aux_bit, a, N, n):
+
+def apply_controlled_exponentiation(qc, up_reg, down_reg, aux_bit, a, N):
     """Выполняет последовательное контролируемое модульное возведение в степень:
 
     реализует унитарное преобразование |x⟩ ⊗ |1⟩ → |x⟩ ⊗ |a^x mod N⟩.
@@ -326,18 +357,17 @@ def apply_controlled_exponentiation(qc, up_reg, down_reg, aux_bit, a, N, n):
     :param aux_bit: Вспомогательный кубит для контроля переполнений в модульной арифметике
     :param a: Основание степени
     :param N: Модуль
-    :param n: Количество кубитов в регистрах
-    :type n: int
     :return: None
     """
     for i in range(len(up_reg)):
         exponent = pow(a, 2 ** i, N)
-        cMULTmodN(qc, up_reg[i], down_reg, down_reg, aux_bit, exponent, N, n)
+        cMULTmodN(qc, up_reg[i], down_reg, down_reg, aux_bit, exponent, N)
 
-def find_period(x, n, N, a):
+
+def find_period(x: int, n: int, N: int, a: int):
     """Ищет период функции f(x) = a^x mod N на основе результата измерения квантового регистра
 
-    :param x: Результат измерения верхнего регистра (целое число)
+    :param x: Результат измерения верхнего регистра
     :param n: Количество кубитов в верхнем регистре (разрядность измерения)
     :param N: Число, подлежащее факторизации
     :param a: Основание степени, взаимно простое с N
@@ -354,14 +384,14 @@ def find_period(x, n, N, a):
         return r
     return None
 
-def measure_and_analyze(qc, up_reg, shots=1024):
+
+def measure_and_analyze(qc: QuantumCircuit, up_reg: list[int], shots=1024) -> dict[str, int]:
     """Измеряет верхний регистр схемы после применения обратного квантового преобразования Фурье
 
-    :param qc: Квантовая схема (экземпляр QuantumCircuit)
+    :param qc: Квантовая схема
     :param up_reg: Список индексов кубитов верхнего регистра, подлежащих измерению
     :param shots: Количество измерений (по умолчанию 1024)
     :return: Словарь вида {'битовая строка': число повторений}
-    :rtype: dict[str, int]
     """
 
     inverse_qft(qc, up_reg)
@@ -371,7 +401,8 @@ def measure_and_analyze(qc, up_reg, shots=1024):
     #     print(f"{k} — {v} раз")
     return result
 
-def shor(N, a, shots=1024):
+
+def shor(N: int, a: int, shots=1024) -> list[int] | None:
     """Выполняет полный цикл алгоритма Шора с квантовой симуляцией и классической постобработкой
 
     :param N: Целое число, подлежащее факторизации
@@ -382,22 +413,28 @@ def shor(N, a, shots=1024):
     :type shots: int
     :return: None. Результаты выводятся в консоль
     """
+
     qc, up_reg, down_reg, aux_bit, n = initialize_shor_circuit(N)
-    apply_controlled_exponentiation(qc, up_reg, down_reg, aux_bit, a, N, n)
+    apply_controlled_exponentiation(qc, up_reg, down_reg, aux_bit, a, N)
     result = measure_and_analyze(qc, up_reg, shots)
     for bitstring in result:
         x = int(bitstring, 2)
         r = find_period(x, 2 * n, N, a)
         if r:
             print(f"Найден период r = {r}")
-            factor1 = math.gcd(pow(a, r//2) - 1, N)
-            factor2 = math.gcd(pow(a, r//2) + 1, N)
+            factor1 = math.gcd(pow(a, r // 2) - 1, N)
+            factor2 = math.gcd(pow(a, r // 2) + 1, N)
             if factor1 not in [1, N] and factor2 not in [1, N]:
                 print(f"Найдено: {factor1} × {factor2} = {N}")
-                return
+                return [factor1, factor2]
     print("Не удалось найти период — попробуйте с другим 'a'")
+    return None
 
 if __name__ == "__main__":
     N = int(input("Введите N для факторизации: "))
     a = int(input(f"Введите a (взаимнопростое с {N}): "))
-    shor(N, a, shots=512)
+
+    if math.gcd(N, a) == 1:
+        shor(N, a, shots=512)
+    else:
+        print(f"Пожалуйста, введите число, взаимно постое с N")
